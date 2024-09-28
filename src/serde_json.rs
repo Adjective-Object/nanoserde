@@ -239,6 +239,14 @@ impl DeJsonState {
         }
     }
 
+    pub fn err_custom(&self, msg: impl Into<String>) -> DeJsonErr {
+        DeJsonErr {
+            msg: msg.into(),
+            line: self.line,
+            col: self.col,
+        }
+    }
+
     pub fn eat_comma_block(&mut self, i: &mut Chars) -> Result<(), DeJsonErr> {
         match self.tok {
             DeJsonTok::Comma => {

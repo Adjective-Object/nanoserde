@@ -47,6 +47,10 @@ pub fn derive_ser_json_struct(struct_: &Struct) -> TokenStream {
 
     if struct_.fields.len() >= 1 {
         for (_index, field) in struct_.fields.iter().enumerate() {
+            if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+                return format!("compile_error!({:?});", msg).parse().unwrap();
+            }
+
             let struct_fieldname = field.field_name.clone().unwrap();
             let json_fieldname =
                 shared::attrs_rename(&field.attributes).unwrap_or_else(|| struct_fieldname.clone());
@@ -60,12 +64,16 @@ pub fn derive_ser_json_struct(struct_: &Struct) -> TokenStream {
                 let proxy_attr = crate::shared::attrs_proxy(&field.attributes);
                 let struct_null_on_none = shared::attrs_serialize_none_as_null(&struct_.attributes);
                 let field_null_on_none = shared::attrs_serialize_none_as_null(&field.attributes);
-                let null_on_none = (field_null_on_none || struct_null_on_none) && proxy_attr.is_none();
-                let field_header = &format!("if first_field_was_serialized {{
+                let null_on_none =
+                    (field_null_on_none || struct_null_on_none) && proxy_attr.is_none();
+                let field_header = &format!(
+                    "if first_field_was_serialized {{
                                                  s.conl();
                                              }};
                                              first_field_was_serialized = true;
-                                             s.field(d+1, \"{}\");", json_fieldname);
+                                             s.field(d+1, \"{}\");",
+                    json_fieldname
+                );
                 l!(
                     s,
                     "{}
@@ -132,6 +140,10 @@ pub fn derive_de_json_named(name: &str, defaults: bool, fields: &[Field]) -> Tok
     let container_attr_default = defaults;
 
     for field in fields {
+        if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+            return format!("compile_error!({:?});", msg).parse().unwrap();
+        }
+
         let struct_fieldname = field.field_name.as_ref().unwrap().to_string();
         let localvar = format!("_{}", struct_fieldname);
         let field_attr_default = shared::attrs_default(&field.attributes);
@@ -314,6 +326,10 @@ pub fn derive_ser_json_enum(enum_: &Enum) -> TokenStream {
                 let mut field_names = vec![];
                 let last = contents.fields.len().saturating_sub(1);
                 for (index, field) in contents.fields.iter().enumerate() {
+                    if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+                        return format!("compile_error!({:?});", msg).parse().unwrap();
+                    }
+
                     if let Some(name) = &&field.field_name {
                         let proxied_field = ser_proxy_guard(name, field);
                         if index == last {
@@ -430,6 +446,10 @@ pub fn derive_de_json_enum(enum_: &Enum) -> TokenStream {
     let mut r_rest = String::new();
     let (generic_w_bounds, generic_no_bounds) = enum_bounds_strings(enum_, "DeJson");
 
+    if let Err(msg) = shared::validate_attrs(&enum_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
+
     for variant in &enum_.variants {
         let field_name = variant.field_name.clone().unwrap();
         let json_variant_name =
@@ -541,6 +561,10 @@ pub fn derive_ser_json_struct_unnamed(struct_: &Struct) -> TokenStream {
     let mut body = String::new();
     let (generic_w_bounds, generic_no_bounds) = struct_bounds_strings(struct_, "SerJson");
 
+    if let Err(msg) = shared::validate_attrs(&struct_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
+
     let transparent = shared::attrs_transparent(&struct_.attributes);
 
     // encode empty struct as {}
@@ -557,7 +581,11 @@ pub fn derive_ser_json_struct_unnamed(struct_: &Struct) -> TokenStream {
     else {
         l!(body, "s.out.push('[');");
         let last = struct_.fields.len() - 1;
-        for (n, _) in struct_.fields.iter().enumerate() {
+        for (n, field) in struct_.fields.iter().enumerate() {
+            if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+                return format!("compile_error!({:?});", msg).parse().unwrap();
+            }
+
             l!(body, "self.{}.ser_json(d, s);", n);
             if n != last {
                 l!(body, "s.out.push_str(\", \");");
@@ -588,6 +616,10 @@ pub fn derive_ser_json_struct_unnamed(struct_: &Struct) -> TokenStream {
 pub fn derive_de_json_struct_unnamed(struct_: &Struct) -> TokenStream {
     let mut body = String::new();
     let (generic_w_bounds, generic_no_bounds) = struct_bounds_strings(struct_, "DeJson");
+
+    if let Err(msg) = shared::validate_attrs(&struct_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
 
     let transparent = shared::attrs_transparent(&struct_.attributes);
 

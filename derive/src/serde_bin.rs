@@ -3,7 +3,7 @@ use alloc::string::String;
 
 use crate::{
     parse::{Category, Enum, Struct, Type},
-    shared::{enum_bounds_strings, struct_bounds_strings},
+    shared::{self, enum_bounds_strings, struct_bounds_strings},
 };
 
 use proc_macro::TokenStream;
@@ -40,7 +40,15 @@ pub fn derive_ser_bin_struct(struct_: &Struct) -> TokenStream {
     let mut body = String::new();
     let (generic_w_bounds, generic_no_bounds) = struct_bounds_strings(struct_, "SerBin");
 
+    if let Err(msg) = shared::validate_attrs(&struct_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
+
     for field in &struct_.fields {
+        if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+            return format!("compile_error!({:?});", msg).parse().unwrap();
+        }
+
         if let Some(proxy) = crate::shared::attrs_proxy(&field.attributes) {
             l!(
                 body,
@@ -79,7 +87,14 @@ pub fn derive_ser_bin_struct_unnamed(struct_: &Struct) -> TokenStream {
     let mut body = String::new();
     let (generic_w_bounds, generic_no_bounds) = struct_bounds_strings(struct_, "SerBin");
 
+    if let Err(msg) = shared::validate_attrs(&struct_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
+
     for (n, field) in struct_.fields.iter().enumerate() {
+        if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+            return format!("compile_error!({:?});", msg).parse().unwrap();
+        }
         if let Some(proxy) = crate::shared::attrs_proxy(&field.attributes) {
             l!(body, "let proxy: {} = Into::into(&self.{});", proxy, n);
             l!(body, "proxy.ser_bin(s);");
@@ -109,7 +124,15 @@ pub fn derive_de_bin_struct(struct_: &Struct) -> TokenStream {
     let mut body = String::new();
     let (generic_w_bounds, generic_no_bounds) = struct_bounds_strings(struct_, "DeBin");
 
+    if let Err(msg) = shared::validate_attrs(&struct_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
+
     for field in &struct_.fields {
+        if let Err(msg) = shared::validate_field_attrs(&field.attributes) {
+            return format!("compile_error!({:?});", msg).parse().unwrap();
+        }
+
         if let Some(proxy) = crate::shared::attrs_proxy(&field.attributes) {
             l!(body, "{}: {{", field.field_name.as_ref().unwrap());
             l!(body, "let proxy: {} = DeBin::de_bin(o, d)?;", proxy);
@@ -148,7 +171,14 @@ pub fn derive_de_bin_struct_unnamed(struct_: &Struct) -> TokenStream {
     let mut body = String::new();
     let (generic_w_bounds, generic_no_bounds) = struct_bounds_strings(struct_, "DeBin");
 
+    if let Err(msg) = shared::validate_attrs(&struct_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
+
     for (n, field) in struct_.fields.iter().enumerate() {
+        if let Err(msg) = shared::validate_field_attrs(&struct_.attributes) {
+            return format!("compile_error!({:?});", msg).parse().unwrap();
+        }
         if let Some(proxy) = crate::shared::attrs_proxy(&field.attributes) {
             l!(body, "{}: {{", n);
             l!(body, "let proxy: {} = DeBin::de_bin(o, d)?;", proxy);
@@ -261,6 +291,10 @@ pub fn derive_ser_bin_enum(enum_: &Enum) -> TokenStream {
 pub fn derive_de_bin_enum(enum_: &Enum) -> TokenStream {
     let mut r = String::new();
     let (generic_w_bounds, generic_no_bounds) = enum_bounds_strings(enum_, "DeBin");
+
+    if let Err(msg) = shared::validate_attrs(&enum_.attributes) {
+        return format!("compile_error!({:?});", msg).parse().unwrap();
+    }
 
     for (index, variant) in enum_.variants.iter().enumerate() {
         let lit = format!("{}u16", index);

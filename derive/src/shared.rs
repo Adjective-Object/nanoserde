@@ -4,6 +4,7 @@ use alloc::{
     vec::Vec,
 };
 
+use crate::parse::Attribute;
 #[cfg(any(feature = "binary", feature = "json"))]
 use crate::parse::{Enum, Struct};
 
@@ -15,6 +16,100 @@ macro_rules! l {
     ($target:ident, $line:expr, $($param:expr),*) => {
         $target.push_str(&::alloc::format!($line, $($param,)*))
     };
+}
+
+fn expect_args_len(attr: &Attribute, expected_len: usize) -> Result<(), String> {
+    if attr.tokens.len() != expected_len + 1 {
+        return Err(format!(
+            "Attribute \"{}\" expects {} arguments, found {}",
+            attr.tokens[0].as_str(),
+            expected_len,
+            attr.tokens.len() - 1
+        ));
+    }
+    Ok(())
+}
+
+fn expect_args_lens(attr: &Attribute, expected_lens: &[usize]) -> Result<(), String> {
+    if !expected_lens
+        .iter()
+        .any(|expected_len| attr.tokens.len() == expected_len + 1)
+    {
+        let mut lens = expected_lens
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>();
+        let last = lens.pop();
+        let lens_msg = lens.join(", ") + " or " + last.unwrap().as_str();
+
+        return Err(format!(
+            "Attribute \"{}\" expects {} arguments, found {}",
+            attr.tokens[0].as_str(),
+            lens_msg,
+            attr.tokens.len() - 1
+        ));
+    }
+    Ok(())
+}
+
+pub fn validate_attrs(attributes: &[Attribute]) -> Result<(), String> {
+    for attr in attributes.iter() {
+        if attr.tokens.len() < 1 {
+            return Err("Attribute must have at least one token".to_string());
+        }
+
+        let attr_name = attr.tokens[0].as_str();
+        let result = match attr_name {
+            "proxy" => expect_args_len(attr, 1),
+            "rename" => expect_args_len(attr, 1),
+            "default" => expect_args_lens(attr, &[0, 1]),
+            "default_with" => expect_args_len(attr, 1),
+            "transparent" => expect_args_len(attr, 0),
+            "skip" => expect_args_len(attr, 0),
+            _ => {
+                return Err(format!(
+                    "unrecognized nserde() struct attribute: {:?}",
+                    attr_name
+                ))
+            }
+        };
+
+        if let Err(e) = result {
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_field_attrs(attributes: &[Attribute]) -> Result<(), String> {
+    for attr in attributes.iter() {
+        if attr.tokens.len() < 1 {
+            return Err("Attribute must have at least one token".to_string());
+        }
+
+        let attr_name = attr.tokens[0].as_str();
+        let result = match attr_name {
+            "proxy" => expect_args_len(attr, 1),
+            "rename" => expect_args_len(attr, 1),
+            "default" => expect_args_lens(attr, &[0, 1]),
+            "default_with" => expect_args_len(attr, 1),
+            "serialize_none_as_null" => expect_args_len(attr, 0),
+            "skip" => expect_args_len(attr, 0),
+            _ => {
+                return Err(format!(
+                    "unrecognized nserde() field attribute: {:?}",
+                    attr_name
+                ))
+            }
+        };
+
+        if let Err(e) = result {
+            return Err(e);
+        }
+    }
+
+    Ok(())
 }
 
 pub fn attrs_proxy(attributes: &[crate::parse::Attribute]) -> Option<String> {
